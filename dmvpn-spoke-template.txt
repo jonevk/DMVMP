@@ -1,0 +1,46 @@
+crypto isakmp policy 1
+ encr aes
+ authentication pre-share
+ group 14
+crypto isakmp key cisco47 address 0.0.0.0
+!
+crypto ipsec transform-set trans2 esp-aes esp-sha-hmac
+ mode transport
+!
+crypto ipsec profile vpnprof
+ set transform-set trans2
+!
+interface Tunnel0
+ bandwidth 1000
+ ip address 10.0.0.2 255.255.255.0
+ ip mtu 1400
+! The following line must match on all nodes that want to use this mGRE tunnel:
+ ip nhrp authentication donttell
+! Definition of NHRP server at the hub (10.0.0.1), which is permanently mapped to the static public address of the hub (172.17.0.1).
+ ip nhrp map 10.0.0.1 172.17.0.1
+! Sends multicast packets to the hub router, and enables the use of a dynamic routing protocol between the spoke and the hub.
+ ip nhrp map multicast 172.17.0.1
+! The following line must match on all nodes that want to use this mGRE tunnel:
+ ip nhrp network-id 99 
+ ip nhrp holdtime 300
+! Configures the hub router as the NHRP next-hop server.
+ ip nhrp nhs 10.0.0.1
+ ip tcp adjust-mss 1360
+ delay 1000
+ tunnel source Ethernet0
+ tunnel mode gre multipoint
+! The following line must match on all nodes that want to use this mGRE tunnel:
+ tunnel key 100000
+ tunnel protection ipsec profile vpnprof
+!
+! This is a spoke, so the public address might be dynamically assigned via DHCP.
+interface Ethernet0
+ ip address dhcp hostname Spoke1
+!
+interface Ethernet1
+ ip address 192.168.1.1 255.255.255.0
+!
+! EIGRP is configured to run over the inside physical interface and the tunnel.
+router eigrp 1
+ network 10.0.0.0 0.0.0.255
+ network 192.168.1.0 0.0.0.255
